@@ -57,11 +57,6 @@ nullbr API (数据源)
 ## 📝 配置信息
 
 ### 前端配置 (index.html)
-```javascript
-const BASE_API = 'https://movie-proxy.stef-woo.workers.dev/api';
-const APP_ID = '8bWDEoOb1';
-const API_KEY = 'O17EbOfMl28VGpqnv5LJxYrwbXp3q2Wo';
-```
 
 ### API 配置 (Cloudflare Workers)
 - **源站**: https://api.nullbr.eu.org
