@@ -1,42 +1,44 @@
-# 🎬 你的「影视搜索」开发小结（截至 2026-01-25）
+# 🎬 影视搜索 (Movie Search)
 
-## ✅ 已完成
-1. 需求锁定  
-   - 纯手机用，搜索 → 选片 → 分段展示 115/磁力链接 → 一键唤起下载器  
-   - 不托管资源、不展示海报，极简、零备案风险  
+本项目是一个极简的影视资源搜索工具，基于 Cloudflare Pages 和 Workers 部署。它不存储任何影视资源，仅作为 [nullbr.online](https://nullbr.online/) 的前端展示与 API 转发工具。
 
-2. 技术栈 & 目录  
-   ```
-   project/
-   ├─ wrangler.toml        # 指向 worker.js
-   ├─ worker.js            # ES Module 格式的 CF Worker 反向代理
-   └─ index.html           # 单页应用（搜索+详情）
-   ```
+## ✨ 功能特点
 
-3. 核心链路跑通  
-   - 搜索 `/api/search?query=xxx` → 返回多部电影（含 id）  
-   - 点电影 → `/api/movie/{id}` → 详情含 115_links & magnets  
-   - 本地 `wrangler dev` 已能 200 返回 JSON，CORS 由 Worker 统一加头  
+- 🚀 **极速搜索**：支持电影、电视剧搜索，实时获取结果。
+- 📱 **移动端优化**：纯原生 JS 编写，完美适配手机浏览器，支持 PWA（添加到主屏）。
+- 📁 **资源聚合**：分段展示 115 网盘资源、中文字幕磁力链接。
+- 📺 **剧集支持**：支持电视剧按季、按集展开查看磁力资源。
+- ⚙️ **灵活配置**：支持在前端页面直接配置自定义 `APP_ID` 和 `API_KEY`。
+- 💰 **零成本部署**：完全利用 Cloudflare 的免费额度。
 
-4. 工具链就绪  
-   - 用 Bun 安装并驱动 Wrangler，命令与 npm 完全一致  
-   - 开发循环：`bunx wrangler dev` → 浏览器 `localhost:8787` 实时刷新  
+## 🛠️ 技术架构
 
-## 🔜 下一步（进入「vibe coding IDE」即可一口气完成）
-1. 把 `worker.js` + `index.html` 推到 Cloudflare  
-   - `bunx wrangler publish` → 获得 `https://xxx.workers.dev`  
-   - 同一目录 `wrangler pages deploy .` 可把前端丢到 Pages，自动 CI  
+- **前端**：Cloudflare Pages (纯 HTML/JS/CSS)
+- **后端**：Cloudflare Workers (反向代理，解决跨域及 API 鉴权)
+- **数据源**：nullbr API
 
-2. 前端小打磨（可选，5 分钟量级）  
-   - 把 `BASE_API` 换成正式域名  
-   - 套 Tailwind/ Pico.css → 全屏 PWA → 手机「添加到主屏」无地址栏  
+## 🚀 快速部署
 
-3. 上线后零维护  
-   - 纯静态 + Serverless，无数据库、无账单、不怕下架  
-   - 后续想加「缓存」「多源聚合」只需改 `worker.js`，继续 `bunx wrangler publish` 秒发版  
+### 1. 部署 API (Workers)
+1. 将 `worker.js` 的代码复制到 Cloudflare Workers。
+2. 配置您的 `wrangler.toml`。
+3. 执行 `wrangler deploy`。
 
-你现在只需在 vibe coding 的终端里执行：
-```
-bunx wrangler publish
-```
-即可把整条链路部署到全球边缘节点，完工！
+### 2. 部署前端 (Pages)
+1. 修改 `index.html` 中的 `BASE_API` 为您部署好的 Worker 地址。
+2. 执行 `wrangler pages deploy . --project-name your-project-name`。
+
+## ⚙️ 配置说明
+
+为了保护账号安全，本项目建议：
+- 在 `index.html` 中保持默认 `APP_ID`。
+- 在页面设置中填入您自己的 `API_KEY`。
+
+## 📄 免责声明
+
+1. 本项目仅供学习和研究使用，代码完全开源。
+2. 搜索结果的所有权及解释权归原资源站点 [nullbr.online](https://nullbr.online/) 所有。
+3. 请勿将本项目用于任何商业用途。
+
+---
+如果本项目对你有帮助，欢迎点个 Star 🌟
