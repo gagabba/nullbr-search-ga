@@ -114,10 +114,9 @@ footer { background: #fff; border-top: 1px solid #ddd; padding: 30px 16px; margi
 
 <div class="usage-tip">
   <strong>💡 使用提示：</strong><br>
-  本服务需要配置 <code>APP_ID</code> 和 <code>API_KEY</code> 才能正常获取资源。<br>
-  1. <code>API_KEY</code>：拥有 nullbr 账号即可在后台拿到。<br>
-  2. <code>APP_ID</code>：需在 nullbr 申请。您可以暂时使用默认 ID，也可以申请自己的。<br>
-  <strong>特别说明：</strong>请务必填入您自己的 <code>API_KEY</code>，若共用默认 Key 可能导致账号被封禁。
+  1. <strong>访问密码（必填）</strong>：请在右上角设置中填写正确的访问密码才能使用搜索。<br>
+  2. <strong>API KEY（可选）</strong>：填写后可解锁 115网盘 和 磁力链接 资源显示。未填写只能进行基础搜索。<br>
+  3. <strong>APP ID（可选）</strong>：留空使用系统默认。
 </div>
 
 <div id="status" class="status-bar" style="display:none"></div>
@@ -126,21 +125,25 @@ footer { background: #fff; border-top: 1px solid #ddd; padding: 30px 16px; margi
 
 <footer>
   <div class="source-info">
-    本项目资源来源于：<a href="https://nullbr.online/" target="_blank">https://nullbr.online/</a>
+    本项目资源来源于：<a href="https://nullbr.com/" target="_blank">https://nullbr.com/</a>
   </div>
 </footer>
 
 <!-- Settings Modal -->
 <div id="settingsModal" class="modal" onclick="if(event.target===this)closeSettings()">
   <div class="modal-content">
-    <h3 class="modal-title">API 设置</h3>
+    <h3 class="modal-title">系统设置</h3>
+    <div class="modal-row">
+      <label>访问密码（必填，否则无法搜索）</label>
+      <input type="password" id="settingAccessPass" placeholder="请输入访问密码" />
+    </div>
+    <div class="modal-row">
+      <label>API KEY（可选，用于获取资源链接）</label>
+      <input type="text" id="settingApiKey" placeholder="请输入 API KEY" />
+    </div>
     <div class="modal-row">
       <label>APP ID（留空使用默认）</label>
       <input type="text" id="settingAppId" placeholder="留空使用系统默认" />
-    </div>
-    <div class="modal-row">
-      <label>API KEY（可选，用于获取 115/磁力资源）</label>
-      <input type="text" id="settingApiKey" placeholder="请输入 API KEY" />
     </div>
     <div class="modal-btns">
       <button class="btn-secondary" onclick="closeSettings()">取消</button>
@@ -150,9 +153,11 @@ footer { background: #fff; border-top: 1px solid #ddd; padding: 30px 16px; margi
 </div>
 
 <script>
+// 注意：请将这里的 BASE_API 替换为你自己部署的 Worker 地址
 const BASE_API = 'https://nullbr-api.gagabba.workers.dev/api';
 const COOKIE_APP_ID = 'movie_search_app_id';
 const COOKIE_API_KEY = 'movie_search_api_key';
+const COOKIE_ACCESS_PASS = 'movie_search_access_pass';
 const DEFAULT_APP_ID = '8bWDEoOb1';
 
 // Cookie helpers
@@ -170,11 +175,10 @@ function getCookie(name) {
 function getConfig() {
   const cookieAppId = getCookie(COOKIE_APP_ID);
   return {
-    // Use cookie value if set, otherwise use default
     appId: cookieAppId || DEFAULT_APP_ID,
-    // Track if user has customized appId
     isCustomAppId: !!cookieAppId,
-    apiKey: getCookie(COOKIE_API_KEY) || ''
+    apiKey: getCookie(COOKIE_API_KEY) || '',
+    accessPass: getCookie(COOKIE_ACCESS_PASS) || ''
   };
 }
 
@@ -183,21 +187,26 @@ function checkConfig() {
   const cfg = getConfig();
   const statusEl = document.getElementById('status');
   statusEl.style.display = 'block';
-  statusEl.className = 'status-bar ok';
-  if (cfg.isCustomAppId) {
-    statusEl.textContent = '✓ 已使用自定义 APP ID' + (cfg.apiKey ? ' 和 API KEY' : '（如需资源链接请配置 API KEY）');
-  } else {
-    statusEl.textContent = '✓ 使用默认 APP ID（点击设置可自定义）' + (cfg.apiKey ? ' · API KEY 已配置' : '');
+  
+  if (!cfg.accessPass) {
+    statusEl.className = 'status-bar error';
+    statusEl.textContent = '⚠️ 尚未配置访问密码，请点击右上角设置填写。';
+    return false;
   }
+
+  statusEl.className = 'status-bar ok';
+  let statusText = '✓ 访问密码已配置';
+  statusText += cfg.apiKey ? ' · API KEY 已配置' : '（未配置 API KEY，仅支持搜索）';
+  statusEl.textContent = statusText;
   return true;
 }
 
 // Settings modal
 function openSettings() {
   const cfg = getConfig();
-  // Show empty if using default, otherwise show custom value
   document.getElementById('settingAppId').value = cfg.isCustomAppId ? cfg.appId : '';
   document.getElementById('settingApiKey').value = cfg.apiKey;
+  document.getElementById('settingAccessPass').value = cfg.accessPass;
   document.getElementById('settingsModal').classList.add('show');
 }
 function closeSettings() {
@@ -206,29 +215,38 @@ function closeSettings() {
 function saveSettings() {
   const appId = document.getElementById('settingAppId').value.trim();
   const apiKey = document.getElementById('settingApiKey').value.trim();
+  const accessPass = document.getElementById('settingAccessPass').value.trim();
 
-  // If appId is empty, clear cookie to use default
-  if (appId) {
-    setCookie(COOKIE_APP_ID, appId);
-  } else {
-    // Clear cookie to use default
-    setCookie(COOKIE_APP_ID, '', -1);
-  }
+  if (appId) setCookie(COOKIE_APP_ID, appId);
+  else setCookie(COOKIE_APP_ID, '', -1);
 
-  if (apiKey) {
-    setCookie(COOKIE_API_KEY, apiKey);
-  } else {
-    setCookie(COOKIE_API_KEY, '', -1);
-  }
+  if (apiKey) setCookie(COOKIE_API_KEY, apiKey);
+  else setCookie(COOKIE_API_KEY, '', -1);
+
+  if (accessPass) setCookie(COOKIE_ACCESS_PASS, accessPass);
+  else setCookie(COOKIE_ACCESS_PASS, '', -1);
 
   closeSettings();
   checkConfig();
 }
 
+// 通用的 Fetch Headers 获取函数
+function getFetchHeaders(includeApiKey = false) {
+  const cfg = getConfig();
+  const headers = { 
+    'x-app-id': cfg.appId,
+    'x-access-pass': cfg.accessPass
+  };
+  if (includeApiKey && cfg.apiKey) {
+    headers['x-api-key'] = cfg.apiKey;
+  }
+  return headers;
+}
+
 function search(){
   const cfg = getConfig();
-  if (!cfg.appId) {
-    alert('请先配置 APP ID');
+  if (!cfg.accessPass) {
+    alert('请先在设置中配置访问密码');
     openSettings();
     return;
   }
@@ -244,10 +262,10 @@ function search(){
   });
 
   const fetchPromise = fetch(`${BASE_API}/search?query=${encodeURIComponent(kw)}`, {
-    headers: { 'x-app-id': cfg.appId }
+    headers: getFetchHeaders(false)
   })
     .then(r=>{
-      if(r.status === 403) throw new Error('无效的APP ID');
+      if(r.status === 403) throw new Error('访问密码错误或无权限');
       if(r.status === 429) throw new Error('请求过快，请稍后再试');
       if(r.status === 401) throw new Error('无权限访问该资源');
       if(!r.ok) throw new Error(`HTTP ${r.status}: ${r.statusText}`);
@@ -258,6 +276,7 @@ function search(){
     .then(renderList)
     .catch(e=>{
       box.innerHTML = '<div class=item style="color:#f44336">搜索失败: ' + e.message + '</div>';
+      if(e.message.includes('访问密码错误')) openSettings();
     });
 }
 
@@ -295,10 +314,10 @@ function getDetail(id, mediaType = 'movie'){
   const apiPath = mediaType === 'tv' ? 'tv' : 'movie';
 
   const fetchPromise = fetch(`${BASE_API}/${apiPath}/${id}`, {
-    headers: { 'x-app-id': cfg.appId }
+    headers: getFetchHeaders(false)
   })
     .then(r=>{
-      if(r.status === 403) throw new Error('无效的APP ID');
+      if(r.status === 403) throw new Error('访问密码错误或无权限');
       if(r.status === 429) throw new Error('请求过快，请稍后再试');
       if(r.status === 401) throw new Error('无权限访问该资源');
       if(r.status === 404) throw new Error('请求的资源不存在');
@@ -334,91 +353,86 @@ function getDetail(id, mediaType = 'movie'){
         box.appendChild(overview);
       }
 
-      // Resources container - will be populated asynchronously
+      // Resources container
       const resourcesContainer = document.createElement('div');
       resourcesContainer.id = 'resources-container';
       box.appendChild(resourcesContainer);
 
-      if(cfg.apiKey) {
-        // 115 resources (both movie and tv)
-        if(j['115-flg']) {
-          const section115 = createSection('📁 115 网盘');
-          const content115 = document.createElement('div');
-          content115.innerHTML = '<div class="loading-text">加载中...</div>';
-          resourcesContainer.appendChild(section115);
-          resourcesContainer.appendChild(content115);
+      // 只有在配置了 API KEY 或者是白名单(后端自动补全)的情况下，才去请求资源
+      // 为了让白名单用户也能看，前端只要不拦截即可。后端如果没收到 apiKey 会自行判断是否给资源。
+      // 所以这里我们直接发起请求，由后端决定是否返回资源。
+      
+      // 115 resources
+      if(j['115-flg']) {
+        const section115 = createSection('📁 115 网盘');
+        const content115 = document.createElement('div');
+        content115.innerHTML = '<div class="loading-text">加载中...</div>';
+        resourcesContainer.appendChild(section115);
+        resourcesContainer.appendChild(content115);
 
-          fetch(`${BASE_API}/${apiPath}/${id}/115`, {
-            headers: { 'x-app-id': cfg.appId, 'x-api-key': cfg.apiKey }
-          })
-          .then(r=>r.ok ? r.json() : Promise.reject(`HTTP ${r.status}`))
-          .then(data=>{
-            content115.innerHTML = '';
-            if(data['115'] && data['115'].length){
-              data['115'].forEach(l=>content115.appendChild(createLine(l.title,l.share_link)));
-            } else {
-              const tip = document.createElement('div');
-              tip.className='item'; tip.style.color='#999';
-              tip.textContent = '暂无资源';
-              content115.appendChild(tip);
-            }
-          })
-          .catch(e=>{
-            content115.innerHTML = '';
+        fetch(`${BASE_API}/${apiPath}/${id}/115`, {
+          headers: getFetchHeaders(true)
+        })
+        .then(r=>r.ok ? r.json() : Promise.reject(`HTTP ${r.status}`))
+        .then(data=>{
+          content115.innerHTML = '';
+          if(data['115'] && data['115'].length){
+            data['115'].forEach(l=>content115.appendChild(createLine(l.title,l.share_link)));
+          } else {
             const tip = document.createElement('div');
             tip.className='item'; tip.style.color='#999';
-            tip.textContent = '资源加载失败';
+            tip.textContent = '暂无资源或未配置 API KEY（非白名单域名需要配置 API KEY 才能查看）';
             content115.appendChild(tip);
-          });
-        }
+          }
+        })
+        .catch(e=>{
+          content115.innerHTML = '';
+          const tip = document.createElement('div');
+          tip.className='item'; tip.style.color='#999';
+          tip.textContent = '资源加载失败，可能需要配置 API KEY';
+          content115.appendChild(tip);
+        });
+      }
 
-        // Magnet resources
-        if(mediaType === 'movie' && j['magnet-flg']) {
-          const sectionMagnet = createSection('🧲 磁力链接');
-          const contentMagnet = document.createElement('div');
-          contentMagnet.innerHTML = '<div class="loading-text">加载中...</div>';
-          resourcesContainer.appendChild(sectionMagnet);
-          resourcesContainer.appendChild(contentMagnet);
+      // Magnet resources
+      if(mediaType === 'movie' && j['magnet-flg']) {
+        const sectionMagnet = createSection('🧲 磁力链接');
+        const contentMagnet = document.createElement('div');
+        contentMagnet.innerHTML = '<div class="loading-text">加载中...</div>';
+        resourcesContainer.appendChild(sectionMagnet);
+        resourcesContainer.appendChild(contentMagnet);
 
-          fetch(`${BASE_API}/${apiPath}/${id}/magnet`, {
-            headers: { 'x-app-id': cfg.appId, 'x-api-key': cfg.apiKey }
-          })
-          .then(r=>r.ok ? r.json() : Promise.reject(`HTTP ${r.status}`))
-          .then(data=>{
-            contentMagnet.innerHTML = '';
-            // Filter only Chinese subtitle magnets
-            const cnMagnets = data.magnet ? data.magnet.filter(m => m.zh_sub === 1) : [];
-            if(cnMagnets.length){
-              cnMagnets.forEach(l=>contentMagnet.appendChild(createMagnetLine(l.name, l.magnet, l.size)));
-            } else {
-              const tip = document.createElement('div');
-              tip.className='item'; tip.style.color='#999';
-              tip.textContent = '暂无中文字幕磁力链接';
-              contentMagnet.appendChild(tip);
-            }
-          })
-          .catch(e=>{
-            contentMagnet.innerHTML = '';
+        fetch(`${BASE_API}/${apiPath}/${id}/magnet`, {
+          headers: getFetchHeaders(true)
+        })
+        .then(r=>r.ok ? r.json() : Promise.reject(`HTTP ${r.status}`))
+        .then(data=>{
+          contentMagnet.innerHTML = '';
+          const cnMagnets = data.magnet ? data.magnet.filter(m => m.zh_sub === 1) : [];
+          if(cnMagnets.length){
+            cnMagnets.forEach(l=>contentMagnet.appendChild(createMagnetLine(l.name, l.magnet, l.size)));
+          } else {
             const tip = document.createElement('div');
             tip.className='item'; tip.style.color='#999';
-            tip.textContent = '资源加载失败';
+            tip.textContent = '暂无中文字幕磁力链接或未配置 API KEY';
             contentMagnet.appendChild(tip);
-          });
-        }
-
-        // TV Seasons with magnets
-        if(mediaType === 'tv' && j['magnet-flg'] && j.number_of_seasons) {
-          resourcesContainer.appendChild(createSection('🧲 磁力链接（按季）'));
-          renderTVSeasons(resourcesContainer, id, j.number_of_seasons);
-        }
-      } else {
-        const sectionTip = createSection('💡 提示');
-        const tip = document.createElement('div');
-        tip.className='item'; tip.style.color='#666';
-        tip.innerHTML = '如需查看 115 网盘和磁力链接，请点击右上角「设置」配置 API KEY';
-        resourcesContainer.appendChild(sectionTip);
-        resourcesContainer.appendChild(tip);
+          }
+        })
+        .catch(e=>{
+          contentMagnet.innerHTML = '';
+          const tip = document.createElement('div');
+          tip.className='item'; tip.style.color='#999';
+          tip.textContent = '资源加载失败，可能需要配置 API KEY';
+          contentMagnet.appendChild(tip);
+        });
       }
+
+      // TV Seasons with magnets
+      if(mediaType === 'tv' && j['magnet-flg'] && j.number_of_seasons) {
+        resourcesContainer.appendChild(createSection('🧲 磁力链接（按季）'));
+        renderTVSeasons(resourcesContainer, id, j.number_of_seasons);
+      }
+      
     });
 
   Promise.race([fetchPromise, timeoutPromise])
@@ -427,13 +441,11 @@ function getDetail(id, mediaType = 'movie'){
     });
 }
 
-// Render TV Seasons with expandable content
 function renderTVSeasons(box, tvId, seasonCount) {
   const seasonsContainer = document.createElement('div');
   seasonsContainer.id = 'seasons-container';
   box.appendChild(seasonsContainer);
 
-  // Create season items (collapsed by default)
   for(let i = 1; i <= seasonCount; i++) {
     const seasonEl = document.createElement('div');
     seasonEl.className = 'season-item';
@@ -453,7 +465,6 @@ function renderTVSeasons(box, tvId, seasonCount) {
   }
 }
 
-// Toggle season expand/collapse
 window.toggleSeason = function(tvId, seasonNum, headerEl) {
   const contentEl = document.getElementById(`season-content-${seasonNum}`);
   const arrowEl = document.getElementById(`season-arrow-${seasonNum}`);
@@ -465,21 +476,17 @@ window.toggleSeason = function(tvId, seasonNum, headerEl) {
   } else {
     contentEl.classList.add('show');
     arrowEl.classList.add('expanded');
-    // Load season data if not loaded yet
     if(contentEl.dataset.loaded !== 'true') {
       loadSeasonMagnets(tvId, seasonNum, contentEl);
     }
   }
 };
 
-// Load season magnets and episodes
 function loadSeasonMagnets(tvId, seasonNum, containerEl) {
-  const cfg = getConfig();
   containerEl.innerHTML = '<div class="loading-text">加载中...</div>';
 
-  // First get season info to check episode count
   fetch(`${BASE_API}/tv/${tvId}/season/${seasonNum}`, {
-    headers: { 'x-app-id': cfg.appId }
+    headers: getFetchHeaders(false)
   })
   .then(r=>r.ok ? r.json() : Promise.reject(`HTTP ${r.status}`))
   .then(seasonInfo=>{
@@ -488,7 +495,6 @@ function loadSeasonMagnets(tvId, seasonNum, containerEl) {
 
     let html = '';
 
-    // Season level magnets
     if(hasMagnet) {
       html += '<div style="margin-bottom:16px;">';
       html += '<div style="font-size:13px;color:#666;margin-bottom:8px;font-weight:500">整季资源</div>';
@@ -496,7 +502,6 @@ function loadSeasonMagnets(tvId, seasonNum, containerEl) {
       html += '</div>';
     }
 
-    // Episodes list
     if(episodeCount > 0) {
       html += '<div style="font-size:13px;color:#666;margin-bottom:8px;font-weight:500">单集资源</div>';
       html += '<div class="episode-list">';
@@ -519,15 +524,13 @@ function loadSeasonMagnets(tvId, seasonNum, containerEl) {
     containerEl.innerHTML = html;
     containerEl.dataset.loaded = 'true';
 
-    // Load season magnets if available
     if(hasMagnet) {
       fetch(`${BASE_API}/tv/${tvId}/season/${seasonNum}/magnet`, {
-        headers: { 'x-app-id': cfg.appId, 'x-api-key': cfg.apiKey }
+        headers: getFetchHeaders(true)
       })
       .then(r=>r.ok ? r.json() : Promise.reject(`HTTP ${r.status}`))
       .then(data=>{
         const magnetsContainer = document.getElementById(`season-magnets-${seasonNum}`);
-        // Filter only Chinese subtitle magnets
         const cnMagnets = data.magnet ? data.magnet.filter(m => m.zh_sub === 1) : [];
         if(cnMagnets.length) {
           magnetsContainer.innerHTML = cnMagnets.map(m => `
@@ -538,7 +541,7 @@ function loadSeasonMagnets(tvId, seasonNum, containerEl) {
             </div>
           `).join('');
         } else {
-          magnetsContainer.innerHTML = '<div class="empty-state">暂无中文字幕磁力链接</div>';
+          magnetsContainer.innerHTML = '<div class="empty-state">暂无中文字幕磁力链接或未配置 API KEY</div>';
         }
       })
       .catch(e=>{
@@ -552,13 +555,10 @@ function loadSeasonMagnets(tvId, seasonNum, containerEl) {
   });
 }
 
-// Load episode magnets
 window.loadEpisodeMagnets = function(tvId, seasonNum, episodeNum) {
-  const cfg = getConfig();
   const btnEl = event.target;
   const magnetsContainer = document.getElementById(`episode-magnets-${seasonNum}-${episodeNum}`);
 
-  // Toggle visibility
   if(magnetsContainer.style.display === 'block') {
     magnetsContainer.style.display = 'none';
     btnEl.textContent = '查看磁力';
@@ -569,9 +569,8 @@ window.loadEpisodeMagnets = function(tvId, seasonNum, episodeNum) {
   magnetsContainer.style.display = 'block';
   magnetsContainer.innerHTML = '<div class="loading-text">加载中...</div>';
 
-  // First check episode info
   fetch(`${BASE_API}/tv/${tvId}/season/${seasonNum}/episode/${episodeNum}`, {
-    headers: { 'x-app-id': cfg.appId }
+    headers: getFetchHeaders(false)
   })
   .then(r=>r.ok ? r.json() : Promise.reject(`HTTP ${r.status}`))
   .then(epInfo=>{
@@ -583,13 +582,11 @@ window.loadEpisodeMagnets = function(tvId, seasonNum, episodeNum) {
       return;
     }
 
-    // Load episode magnets
     return fetch(`${BASE_API}/tv/${tvId}/season/${seasonNum}/episode/${episodeNum}/magnet`, {
-      headers: { 'x-app-id': cfg.appId, 'x-api-key': cfg.apiKey }
+      headers: getFetchHeaders(true)
     })
     .then(r=>r.ok ? r.json() : Promise.reject(`HTTP ${r.status}`))
     .then(data=>{
-      // Filter only Chinese subtitle magnets
       const cnMagnets = data.magnet ? data.magnet.filter(m => m.zh_sub === 1) : [];
       if(cnMagnets.length) {
         magnetsContainer.innerHTML = cnMagnets.map(m => `
@@ -600,7 +597,7 @@ window.loadEpisodeMagnets = function(tvId, seasonNum, episodeNum) {
           </div>
         `).join('');
       } else {
-        magnetsContainer.innerHTML = '<div class="empty-state">暂无中文字幕磁力链接</div>';
+        magnetsContainer.innerHTML = '<div class="empty-state">暂无中文字幕磁力链接或未配置 API KEY</div>';
       }
       btnEl.textContent = '隐藏磁力';
     });
