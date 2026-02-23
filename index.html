@@ -8,6 +8,74 @@
 * { box-sizing: border-box; }
 body { margin: 0; font: 16px/1.5 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; background: #f5f5f5; display: flex; flex-direction: column; min-height: 100vh; }
 
+/* Password Overlay */
+.password-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: rgba(0,0,0,0.75);
+  z-index: 9999;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+}
+.password-overlay.hidden { display: none; }
+.password-box {
+  background: #fff;
+  width: 90%;
+  max-width: 380px;
+  border-radius: 20px;
+  padding: 32px 24px;
+  text-align: center;
+  box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+}
+.password-box .lock-icon { font-size: 48px; margin-bottom: 12px; }
+.password-box h2 { margin: 0 0 8px; font-size: 20px; color: #333; }
+.password-box p { margin: 0 0 24px; font-size: 14px; color: #888; }
+.password-box input {
+  width: 100%;
+  padding: 14px 16px;
+  font-size: 16px;
+  border: 2px solid #e0e0e0;
+  border-radius: 12px;
+  outline: none;
+  transition: border-color 0.2s;
+  text-align: center;
+}
+.password-box input:focus { border-color: #667eea; }
+.password-box .verify-btn {
+  width: 100%;
+  padding: 14px;
+  font-size: 16px;
+  border: none;
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  color: #fff;
+  border-radius: 12px;
+  cursor: pointer;
+  margin-top: 16px;
+  transition: opacity 0.2s;
+}
+.password-box .verify-btn:active { opacity: 0.85; }
+.password-box .verify-btn:disabled { opacity: 0.6; cursor: not-allowed; }
+.password-error {
+  color: #f44336;
+  font-size: 14px;
+  margin-top: 12px;
+  display: none;
+}
+.password-error.show { display: block; }
+.password-checking {
+  color: #999;
+  font-size: 14px;
+  margin-top: 12px;
+  display: none;
+}
+.password-checking.show { display: block; }
+
 /* Header */
 .header { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: #fff; padding: 20px 16px; text-align: center; }
 .header h1 { margin: 0 0 8px; font-size: 24px; font-weight: 600; }
@@ -27,7 +95,7 @@ body { margin: 0; font: 16px/1.5 -apple-system, BlinkMacSystemFont, "Segoe UI", 
 .search-bar button:active { background: #5a6fd6; }
 
 /* Settings Button */
-.settings-btn { position: fixed; top: 20px; right: 16px; background: rgba(255,255,255,0.2); border: none; color: #fff; padding: 6px 12px; border-radius: 15px; font-size: 12px; cursor: pointer; backdrop-filter: blur(10px); }
+.settings-btn { position: fixed; top: 20px; right: 16px; background: rgba(255,255,255,0.2); border: none; color: #fff; padding: 6px 12px; border-radius: 15px; font-size: 12px; cursor: pointer; backdrop-filter: blur(10px); z-index: 10; }
 .settings-btn:active { background: rgba(255,255,255,0.3); }
 
 /* List Items */
@@ -101,6 +169,20 @@ footer { background: #fff; border-top: 1px solid #ddd; padding: 30px 16px; margi
 </head>
 <body>
 
+<!-- ======== 全屏密码遮罩 ======== -->
+<div id="passwordOverlay" class="password-overlay">
+  <div class="password-box">
+    <div class="lock-icon">🔒</div>
+    <h2>请输入访问密码</h2>
+    <p>本站需要验证访问密码后才能使用</p>
+    <input type="password" id="accessPasswordInput" placeholder="请输入密码" onkeypress="if(event.key==='Enter')verifyPassword()" />
+    <button class="verify-btn" id="verifyBtn" onclick="verifyPassword()">验 证</button>
+    <div class="password-error" id="passwordError">密码错误，请重试</div>
+    <div class="password-checking" id="passwordChecking">正在验证...</div>
+  </div>
+</div>
+<!-- ======== 全屏密码遮罩 END ======== -->
+
 <div class="header">
   <button class="settings-btn" onclick="openSettings()">⚙️ 设置</button>
   <h1>nullbr.online ~ 影视搜索</h1>
@@ -153,7 +235,6 @@ footer { background: #fff; border-top: 1px solid #ddd; padding: 30px 16px; margi
 </div>
 
 <script>
-// 注意：请将这里的 BASE_API 替换为你自己部署的 Worker 地址
 const BASE_API = 'https://nullbr-api.gagabba.workers.dev/api';
 const COOKIE_APP_ID = 'movie_search_app_id';
 const COOKIE_API_KEY = 'movie_search_api_key';
@@ -171,7 +252,6 @@ function getCookie(name) {
   return match ? decodeURIComponent(match[2]) : '';
 }
 
-// Get config from cookie or default
 function getConfig() {
   const cookieAppId = getCookie(COOKIE_APP_ID);
   return {
@@ -182,12 +262,11 @@ function getConfig() {
   };
 }
 
-// Check config on load
 function checkConfig() {
   const cfg = getConfig();
   const statusEl = document.getElementById('status');
   statusEl.style.display = 'block';
-  
+
   if (!cfg.accessPass) {
     statusEl.className = 'status-bar error';
     statusEl.textContent = '⚠️ 尚未配置访问密码，请点击右上角设置填写。';
@@ -199,6 +278,99 @@ function checkConfig() {
   statusText += cfg.apiKey ? ' · API KEY 已配置' : '（未配置 API KEY，仅支持搜索）';
   statusEl.textContent = statusText;
   return true;
+}
+
+// ======== 密码验证逻辑 ========
+async function verifyPasswordWithServer(password) {
+  const resp = await fetch(`${BASE_API}/search?query=test`, {
+    headers: {
+      'x-app-id': DEFAULT_APP_ID,
+      'x-access-pass': password
+    }
+  });
+  // 403 表示密码错误
+  if (resp.status === 403) {
+    return false;
+  }
+  // 其他状态（200、429 等）都说明密码本身是对的
+  return true;
+}
+
+// 页面加载时自动检查已保存的密码
+async function initPasswordCheck() {
+  const overlay = document.getElementById('passwordOverlay');
+  const checkingEl = document.getElementById('passwordChecking');
+  const savedPass = getCookie(COOKIE_ACCESS_PASS);
+
+  if (savedPass) {
+    // 有已保存密码，显示"正在验证"
+    checkingEl.classList.add('show');
+    try {
+      const valid = await verifyPasswordWithServer(savedPass);
+      if (valid) {
+        // 密码正确，隐藏遮罩
+        overlay.classList.add('hidden');
+        checkConfig();
+        return;
+      }
+    } catch (e) {
+      // 网络错误时也放行（避免因网络问题无法使用，实际搜索时还会再校验）
+      overlay.classList.add('hidden');
+      checkConfig();
+      return;
+    }
+    checkingEl.classList.remove('show');
+    // 密码错误，清除旧密码
+    setCookie(COOKIE_ACCESS_PASS, '', -1);
+  }
+
+  // 没有密码或密码错误，显示输入框
+  overlay.classList.remove('hidden');
+  document.getElementById('accessPasswordInput').focus();
+}
+
+// 用户点击"验证"按钮
+async function verifyPassword() {
+  const input = document.getElementById('accessPasswordInput');
+  const errorEl = document.getElementById('passwordError');
+  const checkingEl = document.getElementById('passwordChecking');
+  const btn = document.getElementById('verifyBtn');
+  const password = input.value.trim();
+
+  if (!password) {
+    errorEl.textContent = '请输入密码';
+    errorEl.classList.add('show');
+    return;
+  }
+
+  // 禁用按钮，显示加载
+  btn.disabled = true;
+  btn.textContent = '验证中...';
+  errorEl.classList.remove('show');
+  checkingEl.classList.add('show');
+
+  try {
+    const valid = await verifyPasswordWithServer(password);
+    if (valid) {
+      // 密码正确
+      setCookie(COOKIE_ACCESS_PASS, password);
+      document.getElementById('passwordOverlay').classList.add('hidden');
+      checkConfig();
+    } else {
+      // 密码错误
+      errorEl.textContent = '密码错误，请重试';
+      errorEl.classList.add('show');
+      input.value = '';
+      input.focus();
+    }
+  } catch (e) {
+    errorEl.textContent = '网络错误，请检查网络后重试';
+    errorEl.classList.add('show');
+  }
+
+  btn.disabled = false;
+  btn.textContent = '验 证';
+  checkingEl.classList.remove('show');
 }
 
 // Settings modal
@@ -230,10 +402,9 @@ function saveSettings() {
   checkConfig();
 }
 
-// 通用的 Fetch Headers 获取函数
 function getFetchHeaders(includeApiKey = false) {
   const cfg = getConfig();
-  const headers = { 
+  const headers = {
     'x-app-id': cfg.appId,
     'x-access-pass': cfg.accessPass
   };
@@ -246,13 +417,13 @@ function getFetchHeaders(includeApiKey = false) {
 function search(){
   const cfg = getConfig();
   if (!cfg.accessPass) {
-    alert('请先在设置中配置访问密码');
-    openSettings();
+    document.getElementById('passwordOverlay').classList.remove('hidden');
+    document.getElementById('accessPasswordInput').focus();
     return;
   }
 
   const kw = document.getElementById('q').value.trim();
-  if(!kw){alert('请输入关键词');return;}
+  if(!kw) return;
 
   const box = document.getElementById('list');
   box.innerHTML = '<div class=item style="text-align:center;color:#999;padding:40px">搜索中...</div>';
@@ -276,7 +447,13 @@ function search(){
     .then(renderList)
     .catch(e=>{
       box.innerHTML = '<div class=item style="color:#f44336">搜索失败: ' + e.message + '</div>';
-      if(e.message.includes('访问密码错误')) openSettings();
+      if(e.message.includes('访问密码错误')) {
+        // 密码错误，重新弹出密码遮罩
+        setCookie(COOKIE_ACCESS_PASS, '', -1);
+        document.getElementById('passwordOverlay').classList.remove('hidden');
+        document.getElementById('accessPasswordInput').value = '';
+        document.getElementById('accessPasswordInput').focus();
+      }
     });
 }
 
@@ -327,14 +504,12 @@ function getDetail(id, mediaType = 'movie'){
     .then(j=>{
       box.innerHTML='';
 
-      // Title section
       const h = document.createElement('div');
       h.style.cssText = 'padding:20px;background:#fff;border-bottom:1px solid #f0f0f0';
       h.innerHTML = `<div style="font-size:20px;font-weight:600;color:#333;margin-bottom:8px">${j.title||j.name}</div>
                      <div style="color:#999;font-size:14px">${(j.release_date||'').slice(0,4)} ${j.vote_average ? '· ★ ' + j.vote_average : ''}${mediaType==='tv' && j.number_of_seasons ? ' · ' + j.number_of_seasons + '季' : ''}</div>`;
       box.appendChild(h);
 
-      // Resource status
       const flags = document.createElement('div');
       flags.style.cssText = 'padding:12px 16px;background:#f8f9fa;font-size:14px;color:#666';
       if(mediaType === 'movie') {
@@ -344,7 +519,6 @@ function getDetail(id, mediaType = 'movie'){
       }
       box.appendChild(flags);
 
-      // Overview
       if(j.overview) {
         const overview = document.createElement('div');
         overview.className = 'item';
@@ -353,12 +527,10 @@ function getDetail(id, mediaType = 'movie'){
         box.appendChild(overview);
       }
 
-      // Resources container
       const resourcesContainer = document.createElement('div');
       resourcesContainer.id = 'resources-container';
       box.appendChild(resourcesContainer);
 
-      // 115 resources
       if(j['115-flg']) {
         const section115 = createSection('📁 115 网盘');
         const content115 = document.createElement('div');
@@ -390,7 +562,6 @@ function getDetail(id, mediaType = 'movie'){
         });
       }
 
-      // Magnet resources
       if(mediaType === 'movie' && j['magnet-flg']) {
         const sectionMagnet = createSection('🧲 磁力链接');
         const contentMagnet = document.createElement('div');
@@ -423,12 +594,11 @@ function getDetail(id, mediaType = 'movie'){
         });
       }
 
-      // TV Seasons with magnets
       if(mediaType === 'tv' && j['magnet-flg'] && j.number_of_seasons) {
         resourcesContainer.appendChild(createSection('🧲 磁力链接（按季）'));
         renderTVSeasons(resourcesContainer, id, j.number_of_seasons);
       }
-      
+
     });
 
   Promise.race([fetchPromise, timeoutPromise])
@@ -627,8 +797,8 @@ function createMagnetLine(name, link, size){
   return d;
 }
 
-// Init
-checkConfig();
+// ======== 初始化 ========
+initPasswordCheck();
 </script>
 </body>
 </html>
