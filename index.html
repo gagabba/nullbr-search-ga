@@ -538,10 +538,22 @@ function getDetail(id, mediaType = 'movie'){
         resourcesContainer.appendChild(section115);
         resourcesContainer.appendChild(content115);
 
-        fetch(`${BASE_API}/${apiPath}/${id}/115`, {
-          headers: getFetchHeaders(true)
-        })
-        .then(r=>r.ok ? r.json() : Promise.reject(`HTTP ${r.status}`))
+fetch(`${BASE_API}/${apiPath}/${id}/115`, {
+  headers: getFetchHeaders(true)
+})
+.then(r=>{
+  // ===== 临时调试，用完删除 =====
+  console.log('=== /115 Debug ===');
+  console.log('Status:', r.status);
+  console.log('X-Debug-Origin:', r.headers.get('X-Debug-Origin'));
+  console.log('X-Debug-Referer:', r.headers.get('X-Debug-Referer'));
+  console.log('X-Debug-Whitelisted:', r.headers.get('X-Debug-Whitelisted'));
+  console.log('X-Debug-User-ApiKey:', r.headers.get('X-Debug-User-ApiKey'));
+  console.log('X-Debug-Final-Key:', r.headers.get('X-Debug-Final-Key'));
+  console.log('X-Debug-Backend-Key-Exists:', r.headers.get('X-Debug-Backend-Key-Exists'));
+  // ===== 调试 END =====
+  return r.ok ? r.json() : Promise.reject(`HTTP ${r.status}`);
+})
         .then(data=>{
           content115.innerHTML = '';
           if(data['115'] && data['115'].length){
