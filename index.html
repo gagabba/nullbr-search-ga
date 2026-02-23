@@ -358,10 +358,6 @@ function getDetail(id, mediaType = 'movie'){
       resourcesContainer.id = 'resources-container';
       box.appendChild(resourcesContainer);
 
-      // 只有在配置了 API KEY 或者是白名单(后端自动补全)的情况下，才去请求资源
-      // 为了让白名单用户也能看，前端只要不拦截即可。后端如果没收到 apiKey 会自行判断是否给资源。
-      // 所以这里我们直接发起请求，由后端决定是否返回资源。
-      
       // 115 resources
       if(j['115-flg']) {
         const section115 = createSection('📁 115 网盘');
